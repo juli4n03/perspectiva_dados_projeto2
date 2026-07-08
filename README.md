@@ -1,22 +1,24 @@
-# Projeto 1 — Sistema de Recomendação de Peças de PC (KaBuM)
+# Projeto 2 — Intervalo de Confiança para preço justo para catálogo de hardware
 
-Pipeline de **web scraping → NLP → análise** sobre o catálogo de hardware do
+Pipeline de **web scraping → NLP → análise →  modelagem** sobre o catálogo de hardware do
 KaBuM, que coleta produtos de seis categorias, extrai as especificações técnicas
-embutidas no nome de cada produto e recomenda montagens (*builds*) de PC
-compatíveis e com bom custo-benefício.
+embutidas no nome de cada produto e indica ofertas ou preços originais que sejam
+justos e adequados com a qualidade dos produtos, passando confiança ao usuário
+sobre seu investimento.
 
-> Disciplina: **Perspectivas de Dados** · Autor: **Juliano** · Ano: 2026
+> Disciplina: **Perspectivas de Dados** · Autores: **Juliano e Beatriz** · Ano: 2026
 
 ---
 
 ## Problema
 
-Em e-commerces de hardware, especificações críticas (capacidade, frequência,
-geração, latência, socket, TDP) ficam **embutidas no campo de texto livre do nome
-do produto**, e não em campos estruturados. Isso impede comparações objetivas e,
-principalmente, dificulta saber quais peças são compatíveis entre si. O projeto
-ataca esse problema estruturando o texto e usando as specs recuperadas para montar
-um recomendador de builds.
+Em e-commerces de hardware, a variação constante dos preços em destaque gera
+insegurança nos usuários se o investimento a ser feito leva em conta um preço
+justo, uma oferta imperdível ou um valor superfaturado dos produtos. Isso dificulta
+comparações objetivas e, principalmente, dificulta saber quando um bom negócio
+está sendo realizado. O projeto ataca esse problema estruturando o texto e usando
+as specs recuperadas para montar um modelo que estima intervalos de valor justo
+que pode ser cobrado em cada produto, facilitando a comparação e deixando claro quando uma oferta é realmente relevante.
 
 ---
 
@@ -29,8 +31,13 @@ deixa a ordem explícita:
    Next.js do KaBuM embute na página (ver detalhe abaixo).
 2. **NLP** — estruturação do nome do produto em specs, em duas frentes
    (representação textual clássica + extração de informação via regex).
-3. **Análise / Recomendação** — filtro de compatibilidade + ranking por
-   custo-benefício, em dois modos de uso.
+3. **Análise / Estimação** — filtro de compatibilidade;
+**modelo de preço justo aprendido dos dados** por meio de
+**modelo fundacional tabular (TabICL)**, **SHAP** (explicar o preço) e comparação
+com **conformal prediction** (intervalo de preço → detector de oferta/sobrepreço);
+e levar o recomendador do notebook para um **aplicativo interativo (Streamlit)**
+com demonstração ao vivo.
+
 
 ---
 
@@ -98,11 +105,15 @@ citados no nome (chipset, latência CL) ficaram baixos por natureza do dado.
 
 ---
 
-## 3. Sistema de recomendação
+## 3. Estimação
 
 Duas camadas:
 
 ### 3.1 Filtro de compatibilidade (regras rígidas)
+
+(Peças com maior
+compatibilidade com demais possivelmente possuem preços e variações diferentes de peças
+exclusivas)
 
 1. **CPU ↔ placa-mãe** — mesmo socket.
 2. **RAM ↔ placa-mãe** — mesma geração DDR.
@@ -115,15 +126,10 @@ produtos que caíram na categoria errada (ex.: "Suporte para placa de vídeo" na
 categoria GPU, adaptadores na categoria SSD) e exclui RAM SODIMM (notebook) das
 builds desktop.
 
-### 3.2 Ranking por custo-benefício
+### 3.2 Modelo de preço justo
 
-Score normalizado combinando três fatores:
-
-```
-score = 0,5 × preço* + 0,3 × avaliação + 0,2 × popularidade
-```
-
-(*preço normalizado; `popularidade` derivada de `num_avaliacoes`.*)
+Intevalos de preço justo para os produtos estimados a partir do conjunto de
+dados utilizando modelo fundacional tabular (TabICL). 
 
 ### 3.3 Dois modos de uso
 
@@ -135,28 +141,6 @@ score = 0,5 × preço* + 0,3 × avaliação + 0,2 × popularidade
   "Ryzen 5 5600") e o sistema retorna as peças compatíveis de outra categoria
   ranqueadas por score (ex.: placas-mãe AM4/DDR4).
 
----
-
-## Resultados
-
-- **Modo 1:** builds coerentes e compatíveis dentro do orçamento (ex.: teste de
-  R$ 5.000 com CPU + placa-mãe + RAM mutuamente compatíveis e fonte adequada).
-- **Modo 2:** para um Ryzen 5 5600, retornou apenas placas-mãe AM4/DDR4, corretas,
-  ordenadas por score.
-
----
-
-## Limitações conhecidas
-
-- **Snapshot único:** a base é uma fotografia de uma data; sem série temporal de
-  preços (mitigável coletando em várias datas — a estrutura de pastas já suporta).
-- **Sem reviews textuais:** só metadados dos produtos, não o texto das avaliações.
-- **Orçamento não é totalmente usado no Modo 1:** os pesos por categoria são fixos
-  e o saldo que sobra em uma categoria **não é redistribuído** para as outras, então
-  o total costuma ficar abaixo do orçamento informado. É a limitação mais relevante
-  e uma candidata natural a melhoria.
-- **Score com pesos fixos e arbitrários:** o custo-benefício é uma heurística feita
-  à mão, não um modelo aprendido dos dados.
 
 ---
 
@@ -164,7 +148,7 @@ score = 0,5 × preço* + 0,3 × avaliação + 0,2 × popularidade
 
 `Python` · `requests` · `BeautifulSoup` · `pandas` · `scikit-learn`
 (`CountVectorizer`, `TfidfVectorizer`, `t-SNE`) · `matplotlib` · `Jupyter`.
-
+`Tab(ICL)` `conformal prediction` `shap` `Streamlit`
 ---
 
 ## Estrutura do repositório
