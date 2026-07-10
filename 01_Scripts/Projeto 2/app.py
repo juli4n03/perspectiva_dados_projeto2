@@ -129,19 +129,16 @@ def carregar_catalogo(model_dir: pathlib.Path) -> Optional[pd.DataFrame]:
 def prever_preco_e_faixa(specs: dict, bundle: dict) -> dict:
     """Retorna {'preco_justo', 'faixa_baixo', 'faixa_alto', 'X_transformado'}.
 
-    A mesma lógica de inferência do notebook v2_02: transforma o input com o
-    pré-processador do bundle, prevê média (`modelo_media`) e variância
-    (`modelo_variancia`), aplica `q_norm` para a faixa e aplica o clip em
-    zero (preço não pode ser negativo).
+    Se `bundle["usa_log"]` for True, o modelo interno prevê log1p(preço) e
+    esta função destransforma para R$ (faixa fica assimétrica, o que é o
+    comportamento correto para preços).
     """
     X1 = pd.DataFrame([specs])
-    # garante todas as colunas esperadas pelo pré-processador
     for c in bundle["num"] + bundle["cat"]:
         if c not in X1.columns:
             X1[c] = np.nan
     X1 = X1[bundle["num"] + bundle["cat"]]
 
-    # normaliza tipos das categóricas (mesmo tratamento do treino)
     for c in bundle["cat"]:
         X1[c] = X1[c].where(X1[c].isna(), X1[c].astype(str))
 
@@ -149,10 +146,22 @@ def prever_preco_e_faixa(specs: dict, bundle: dict) -> dict:
         bundle["preproc"].transform(X1),
         columns=bundle["preproc"].get_feature_names_out(),
     )
-    preco = float(bundle["modelo_media"].predict(Xt)[0])
+    pred_raw = float(bundle["modelo_media"].predict(Xt)[0])
     escala = float(np.sqrt(max(bundle["modelo_variancia"].predict(Xt)[0], 1e-6)))
-    baixo = max(preco - bundle["q_norm"] * escala, 0.0)
-    alto  = preco + bundle["q_norm"] * escala
+
+    usa_log = bundle.get("usa_log", False)
+    if usa_log:
+        # faixa em log-space, depois destransformada -> assimétrica em R$
+        preco = float(np.expm1(pred_raw))
+        baixo = float(np.expm1(pred_raw - bundle["q_norm"] * escala))
+        alto  = float(np.expm1(pred_raw + bundle["q_norm"] * escala))
+    else:
+        # modelo antigo: linear em R$
+        preco = pred_raw
+        baixo = pred_raw - bundle["q_norm"] * escala
+        alto  = pred_raw + bundle["q_norm"] * escala
+
+    baixo = max(baixo, 0.0)
     return {
         "preco_justo": preco,
         "faixa_baixo": baixo,
@@ -308,10 +317,17 @@ def _render_resultado(preco_real: float, resultado: dict, bundle: dict,
 
     st.markdown("---")
     st.subheader("Explicação (SHAP)")
-    st.caption(
-        "Cada barra mostra o quanto uma feature empurrou o preço para cima "
-        "(vermelho) ou para baixo (azul) em relação à média dos produtos."
-    )
+    if bundle.get("usa_log", False):
+        st.caption(
+            "Cada barra mostra o quanto uma feature empurrou o **log-preço** "
+            "para cima (vermelho) ou para baixo (azul). Uma barra de +0.10 "
+            "equivale a aproximadamente +10% no preço final."
+        )
+    else:
+        st.caption(
+            "Cada barra mostra o quanto uma feature empurrou o preço para cima "
+            "(vermelho) ou para baixo (azul) em relação à média dos produtos."
+        )
 
     try:
         explainer = shap.TreeExplainer(bundle["modelo_media"])
@@ -437,8 +453,7 @@ def _computar_precos_justos_cache(catalogo_hash: int, cat: str, _bundle: dict,
                                    df_cat: pd.DataFrame) -> pd.DataFrame:
     """Wrapper cacheado — chave é (hash do catálogo, categoria).
 
-    `_bundle` prefixado com _ para o cache ignorar (bundle não hashea).
-    O hash do catálogo garante invalidação se ele for recarregado.
+    Se `_bundle['usa_log']`, destransforma log→R$ (faixa fica assimétrica).
     """
     df = df_cat.copy()
     campos = _bundle["num"] + _bundle["cat"]
@@ -448,13 +463,21 @@ def _computar_precos_justos_cache(catalogo_hash: int, cat: str, _bundle: dict,
             X[c] = X[c].where(X[c].isna(), X[c].astype(str))
 
     Xt = _bundle["preproc"].transform(X)
-    preco_justo = _bundle["modelo_media"].predict(Xt)
+    pred_raw = _bundle["modelo_media"].predict(Xt)
     variancia = np.maximum(_bundle["modelo_variancia"].predict(Xt), 1e-6)
     escala = np.sqrt(variancia)
 
+    usa_log = _bundle.get("usa_log", False)
+    if usa_log:
+        preco_justo = np.expm1(pred_raw)
+        df["faixa_baixo"] = np.maximum(np.expm1(pred_raw - _bundle["q_norm"] * escala), 0.0)
+        df["faixa_alto"]  = np.expm1(pred_raw + _bundle["q_norm"] * escala)
+    else:
+        preco_justo = pred_raw
+        df["faixa_baixo"] = np.maximum(pred_raw - _bundle["q_norm"] * escala, 0.0)
+        df["faixa_alto"]  = pred_raw + _bundle["q_norm"] * escala
+
     df["preco_justo"] = preco_justo
-    df["faixa_baixo"] = np.maximum(preco_justo - _bundle["q_norm"] * escala, 0.0)
-    df["faixa_alto"] = preco_justo + _bundle["q_norm"] * escala
     df["desvio_pct"] = (df["preco_pix"] - df["preco_justo"]) / df["preco_justo"] * 100
     df["veredito"] = df.apply(
         lambda row: classificar(row["preco_pix"], row["faixa_baixo"], row["faixa_alto"])[0],

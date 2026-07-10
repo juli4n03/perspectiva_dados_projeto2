@@ -180,6 +180,22 @@ def features_cpu(df: pd.DataFrame) -> pd.DataFrame:
     ))
     d["cpu_ddr_suportado"] = d["cpu_socket"].map(SOCKET_DDR)
 
+    # Cores/threads (features novas). Padrões comuns nos nomes:
+    #   "6-Cores", "8 Cores", "6 Núcleos", "12 Threads", "24-Threads"
+    d["cpu_cores"] = n.apply(lambda x: extrair(x,
+        r"(\d+)\s*[-\s]?\s*(?:Cores|Núcleos|Nucleos)", int
+    ))
+    d["cpu_threads"] = n.apply(lambda x: extrair(x,
+        r"(\d+)\s*[-\s]?\s*Threads?", int
+    ))
+    # Clock base em GHz. Padrão: "3.4GHz", "3,4 GHz", "4.7 GHz". Pega o PRIMEIRO
+    # número seguido de GHz (geralmente é o base; boost costuma vir depois).
+    # Extrai como string (float() não aceita vírgula) e converte manualmente.
+    d["cpu_clock_ghz"] = n.apply(lambda x: extrair(x, r"(\d[\.,]\d+)\s*GHz"))
+    d["cpu_clock_ghz"] = d["cpu_clock_ghz"].apply(
+        lambda v: float(str(v).replace(",", ".")) if pd.notna(v) else None
+    )
+
     return d
 
 
@@ -193,7 +209,14 @@ def features_placa_mae(df: pd.DataFrame) -> pd.DataFrame:
 
     d["mobo_socket"]      = n.apply(lambda x: extrair(x, r"(AM[45]|LGA\s?\d{3,4})"))
     d["mobo_socket"]      = d["mobo_socket"].str.replace(" ", "").str.upper()
-    d["mobo_chipset"]     = n.apply(lambda x: extrair(x, r"\b([A-Z]\d{3,4})(?!\s*MHz)\b"))
+    # Chipset: letra + 3-4 dígitos, opcionalmente com sufixo (M, M-A, PRO, etc.)
+    # Ex.: B550, B550M, B550M-A, X670E, Z790, H610M-H, B650M-DS3H.
+    # A chave é usar lookahead pra não exigir word-boundary depois da letra
+    # (que quebra em "B550M-A" porque M-A quebra o \b).
+    d["mobo_chipset"]     = n.apply(lambda x: extrair(x,
+        r"\b([ABHXZ]\d{3,4})(?![.\d])"
+    ))
+    d["mobo_chipset"]     = d["mobo_chipset"].str.upper() if "mobo_chipset" in d.columns else d["mobo_chipset"]
     d["mobo_ddr"]         = n.apply(lambda x: extrair(x, r"(DDR[45])"))
     d["mobo_form_factor"] = n.apply(lambda x: extrair(x, r"\b(ATX|mATX|m-ATX|Micro-ATX|Mini-ATX|ITX|Mini-ITX)\b"))
     d["mobo_slots_m2"]    = n.apply(lambda x: extrair(x, r"(\d+)\s*x?\s*M\.2", int))
@@ -207,26 +230,89 @@ def features_placa_mae(df: pd.DataFrame) -> pd.DataFrame:
 # ---------------------------------------------------------------------------
 
 # modelo GPU → TDP aproximado em Watts
+# Cobre: NVIDIA RTX 20/30/40/50 series, GTX 10/16 series
+#        AMD RX 400/500/5000/6000/7000/9000 series
+#        Intel Arc A/B series
 GPU_TDP = {
+    # NVIDIA RTX 50 series
     "RTX 5090": 575, "RTX 5080": 360, "RTX 5070 Ti": 300, "RTX 5070": 250,
-    "RTX 5060 Ti": 180, "RTX 5060": 150,
-    "RTX 4090": 450, "RTX 4080": 320, "RTX 4070 Ti": 285, "RTX 4070": 200,
+    "RTX 5060 Ti": 180, "RTX 5060": 150, "RTX 5050": 130,
+    # NVIDIA RTX 40 series
+    "RTX 4090": 450, "RTX 4080 Super": 320, "RTX 4080": 320,
+    "RTX 4070 Ti Super": 285, "RTX 4070 Ti": 285,
+    "RTX 4070 Super": 220, "RTX 4070": 200,
     "RTX 4060 Ti": 165, "RTX 4060": 115,
-    "RTX 3090": 350, "RTX 3080": 320, "RTX 3070": 220, "RTX 3060": 170,
-    "RX 9070 XT": 304, "RX 9070": 220,
-    "RX 7900 XTX": 355, "RX 7900 XT": 315, "RX 7800 XT": 263, "RX 7700 XT": 245,
-    "RX 7600": 165, "RX 6700 XT": 230, "RX 6600": 132,
+    # NVIDIA RTX 30 series
+    "RTX 3090 Ti": 450, "RTX 3090": 350,
+    "RTX 3080 Ti": 350, "RTX 3080": 320,
+    "RTX 3070 Ti": 290, "RTX 3070": 220,
+    "RTX 3060 Ti": 200, "RTX 3060": 170,
+    "RTX 3050": 130,
+    # NVIDIA RTX 20 series
+    "RTX 2080 Ti": 250, "RTX 2080 Super": 250, "RTX 2080": 215,
+    "RTX 2070 Super": 215, "RTX 2070": 175,
+    "RTX 2060 Super": 175, "RTX 2060": 160,
+    # NVIDIA GTX 16 series
+    "GTX 1660 Super": 125, "GTX 1660 Ti": 120, "GTX 1660": 120,
+    "GTX 1650 Super": 100, "GTX 1650": 75,
+    "GTX 1630": 75,
+    # NVIDIA GTX 10 series (mainstream)
+    "GTX 1080 Ti": 250, "GTX 1080": 180,
+    "GTX 1070 Ti": 180, "GTX 1070": 150,
+    "GTX 1060": 120, "GTX 1050 Ti": 75, "GTX 1050": 75,
+    "GTX 1030": 30,
+    # NVIDIA GTX 900 (entrada, ainda vendem)
+    "GTX 980 Ti": 250, "GTX 980": 165, "GTX 970": 145, "GTX 960": 120, "GTX 950": 90,
+    # NVIDIA GTX 700 (bem antiga)
+    "GTX 750 Ti": 60, "GTX 750": 55,
+    # NVIDIA GT (entrada, low-end)
+    "GT 1030": 30, "GT 730": 25, "GT 710": 19, "GT 220": 58, "G 210": 30,
+    # NVIDIA GTX 500/400 (legado; adicionadas por aparecerem no dataset)
+    "GTX 580": 244, "GTX 570": 219, "GTX 560 Ti": 170, "GTX 560": 150,
+    "GTX 550 Ti": 116, "GTX 480": 250, "GTX 460": 160,
+    # AMD RX 9000 series
+    "RX 9070 XT": 304, "RX 9070": 220, "RX 9060 XT": 180, "RX 9060": 150,
+    # AMD RX 7000 series
+    "RX 7900 XTX": 355, "RX 7900 XT": 315, "RX 7900 GRE": 260,
+    "RX 7800 XT": 263, "RX 7700 XT": 245,
+    "RX 7600 XT": 190, "RX 7600": 165,
+    # AMD RX 6000 series
+    "RX 6950 XT": 335, "RX 6900 XT": 300,
+    "RX 6800 XT": 300, "RX 6800": 250,
+    "RX 6750 XT": 250, "RX 6700 XT": 230, "RX 6700": 175,
+    "RX 6650 XT": 180, "RX 6600 XT": 160, "RX 6600": 132,
+    "RX 6500 XT": 107, "RX 6400": 53,
+    # AMD RX 5000 series
+    "RX 5700 XT": 225, "RX 5700": 180,
+    "RX 5600 XT": 150, "RX 5500 XT": 130,
+    # AMD RX 500 series (bem popular ainda)
+    "RX 590": 175, "RX 580": 185, "RX 570": 150, "RX 560": 60, "RX 550": 50,
+    # AMD RX 400 series
+    "RX 480": 150, "RX 470": 120, "RX 460": 75,
+    # Intel Arc B series (2024+)
+    "Arc B580": 190, "Arc B570": 150,
+    # Intel Arc A series
+    "Arc A770": 225, "Arc A750": 225, "Arc A580": 185, "Arc A380": 75, "Arc A310": 75,
 }
 
 
 def normalizar_gpu_modelo(s):
-    """Colapsa variações tipo 'RTX 5060 Ti' e 'RTX5060ti' no mesmo texto."""
+    """Colapsa variações tipo 'RTX 5060 Ti' e 'RTX5060ti' no mesmo texto.
+
+    Cobre prefixos: RTX, GTX, RX, GT, ARC.
+    """
     if pd.isna(s):
         return s
     s = str(s).upper()
     s = re.sub(r"\s+", "", s)
-    s = re.sub(r"(RTX|GTX|RX)(\d)", r"\1 \2", s)
-    s = re.sub(r"(\d)(TI|XT|SUPER)", r"\1 \2", s)
+    # separa prefixo de dígito: "RTX5060" -> "RTX 5060", "ARCB580" -> "ARC B580"
+    s = re.sub(r"(RTX|GTX|RX|GT|ARC)(\d)", r"\1 \2", s)
+    # separa dígito de sufixo: "5060TI" -> "5060 TI"
+    s = re.sub(r"(\d)(TI|XT|XTX|SUPER|GRE)", r"\1 \2", s)
+    # separa sufixos compostos: "TISUPER" -> "TI SUPER"
+    s = re.sub(r"(TI|XT)(SUPER)", r"\1 \2", s)
+    # Arc B580 ou Arc A770: os letras/números depois de ARC ficam separados
+    s = re.sub(r"ARC\s*([AB])", r"ARC \1", s)
     return s.strip()
 
 
@@ -238,7 +324,15 @@ def _extrair_modelo_gpu(nome):
         if re.search(re.escape(modelo), nome, re.IGNORECASE):
             return modelo
     # fallback: padrão genérico (pega modelos não catalogados em GPU_TDP)
-    m = re.search(r"(RTX\s?\d{4}(?:\s?Ti)?|RX\s?\d{4}(?:\s?XT)?)", nome, re.IGNORECASE)
+    # Cobre RTX/GTX/GT (Nvidia) + RX (AMD) + Arc (Intel).
+    m = re.search(
+        r"(RTX\s?\d{3,4}(?:\s?Ti(?:\s?Super)?|\s?Super)?"
+        r"|GTX\s?\d{3,4}(?:\s?Ti(?:\s?Super)?|\s?Super)?"
+        r"|GT\s?\d{3,4}(?:\s?Ti)?"
+        r"|RX\s?\d{3,4}(?:\s?XT(?:X)?|\s?GRE)?"
+        r"|Arc\s?[AB]\d{3})",
+        nome, re.IGNORECASE
+    )
     return m.group(1).strip() if m else None
 
 
@@ -281,6 +375,9 @@ def features_ssd(df: pd.DataFrame) -> pd.DataFrame:
         if contem(x, r"\d+\s*TB") else
         extrair(x, r"(\d+)\s*GB", int)
     ))
+    # Velocidade de leitura em MB/s (feature nova) — proxy pra qualidade/geração.
+    # Padrão: "5000MB/s", "leitura 7000MB/s", "7300 mb/s"
+    d["ssd_leitura_mbs"] = n.apply(lambda x: extrair(x, r"(\d{3,5})\s*[Mm][Bb]/[Ss]", int))
     d["ssd_notebook"] = n.apply(lambda x: contem(x, r"Notebook|2230|2242"))
 
     return d
