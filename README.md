@@ -37,10 +37,10 @@ O repositório contém duas iterações do projeto:
 
 ```
 perspectiva_dados_projeto2/
-├── README.md                        ← este arquivo
-├── baixar_dados.py                  ← baixa 00_Dados/ do Drive automaticamente
-├── requirements.txt                 ← dependências Python
-├── 00_Dados/                        ← coletas do scraper (baixado pelo script)
+├── README.md                        
+├── baixar_dados.py (baixa 00_Dados/ do Drive automaticamente)
+├── requirements.txt (dependências Python)
+├── 00_Dados/ (coletas do scraper)
 │   ├── 2026-06-26/
 │   │   ├── kabum_ram_2026-06-26.csv
 │   │   ├── kabum_ram_2026-06-26_features.csv
