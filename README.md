@@ -170,6 +170,21 @@ coletar os dados você mesmo rodando o scraper do v1 (ver seção 1).
 Mas cada coleta captura só o momento atual — os modelos serão treinados
 sobre um dataset diferente do que gerou as métricas deste README.
 
+**Onde os scripts/notebooks esperam encontrar `00_Dados/`**: por padrão,
+todo script e notebook do repositório assume que `00_Dados/` está na
+**raiz do projeto** (dois níveis acima de `01_Scripts/Projeto 1|2/`) — é
+exatamente o que `baixar_dados.py` cria. Se você guardou os dados em outro
+lugar, não precisa editar nenhum código: defina a variável de ambiente
+`KABUM_DATA_ROOT` apontando para a pasta correta antes de rodar qualquer
+coisa:
+
+```powershell
+$env:KABUM_DATA_ROOT = "C:\caminho\para\sua\pasta\00_Dados"
+```
+
+(Os notebooks também respeitam essa variável quando abertos a partir de
+uma sessão do Jupyter iniciada no mesmo terminal.)
+
 ### 4. Gerar o catálogo consolidado
 
 ```powershell

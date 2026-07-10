@@ -11,6 +11,12 @@ from __future__ import annotations
 import pathlib
 import sys
 
+# Força stdout/stderr para UTF-8: o console padrão do Windows (cp1252/cp437)
+# não sabe imprimir caracteres como "✓" usados nos prints abaixo.
+if sys.stdout.encoding.lower() != "utf-8":
+    sys.stdout.reconfigure(encoding="utf-8")
+    sys.stderr.reconfigure(encoding="utf-8")
+
 DRIVE_FOLDER_URL = "https://drive.google.com/drive/folders/1ZSOr9PP7XvwfqOHyXkj7JwfS_0cX-uJU?usp=sharing"
 DESTINO = pathlib.Path(__file__).parent / "00_Dados"
 

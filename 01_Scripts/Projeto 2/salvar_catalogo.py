@@ -22,6 +22,7 @@ from __future__ import annotations
 import glob
 import os
 import pathlib
+import sys
 
 import pandas as pd
 
@@ -35,13 +36,23 @@ from features import (
     normalizar_gpu_modelo,
 )
 
+# Força stdout/stderr para UTF-8: o console padrão do Windows (cp1252/cp437)
+# não sabe imprimir caracteres como "→" ou "✓" usados nos prints abaixo,
+# e quebraria com UnicodeEncodeError em máquinas sem essa configuração.
+if sys.stdout.encoding.lower() != "utf-8":
+    sys.stdout.reconfigure(encoding="utf-8")
+    sys.stderr.reconfigure(encoding="utf-8")
+
 # ---------------------------------------------------------------------------
 # Configuração
 # ---------------------------------------------------------------------------
 
+# 00_Dados/ mora na raiz do repositório (dois níveis acima deste script).
+# Defina a variável de ambiente KABUM_DATA_ROOT para apontar para outro lugar
+# sem editar o código.
 DATA_ROOT = os.environ.get(
     "KABUM_DATA_ROOT",
-    r"C:\Users\julia\OneDrive\Área de Trabalho\Projetos\Perspectivas de Dados\perspectiva_dados_projeto2\00_Dados",
+    str(pathlib.Path(__file__).resolve().parents[2] / "00_Dados"),
 )
 MODEL_DIR = pathlib.Path(__file__).parent / "modelos"
 
