@@ -49,14 +49,17 @@ perspectiva_dados_projeto2/
 │   ├── 2026-07-06/
 │   └── ...
 ├── 01_Scripts/
-│   ├── Projeto 1/                   ← v1: scraper + feature engineering original
-│   │   ├── scraper_kabum.ipynb
-│   │   └── feature_engineering_kabum.ipynb
+│   ├── Projeto 1/                   ← v1: scraper + feature engineering + recomendação original
+│   │   ├── scraper_kabum_pecas.ipynb
+│   │   ├── feature_engineering_kabum.ipynb
+│   │   └── recomendacao_kabum.ipynb
 │   └── Projeto 2/                   ← v2: modelagem + app
-│       ├── features.py              ← módulo único de extração (fonte da verdade)
-│       ├── salvar_catalogo.py       ← gera modelos/catalogo.parquet
-│       ├── v2_02_modelo_preco_todas_categorias.ipynb  ← treino dos 6 modelos
-│       ├── v2_03_modelo_tabicl_unico.ipynb            ← análise comparativa
+│       ├── features.py                              ← módulo único de extração (fonte da verdade)
+│       ├── feature_engineering_kabum_todas_datas.ipynb  ← gera os *_features.csv por coleta
+│       ├── salvar_catalogo.py                        ← gera modelos/catalogo.parquet
+│       ├── v2_01_modelo_preco_ram.ipynb              ← protótipo histórico (só RAM)
+│       ├── v2_02_modelo_preco_todas_categorias.ipynb ← treino dos 6 modelos (o que o app usa)
+│       ├── v2_03_modelo_tabicl_unico.ipynb           ← análise comparativa (pooled + TabICL + conformal)
 │       ├── app.py                   ← Streamlit
 │       └── modelos/                 ← gerado após rodar tudo
 │           ├── modelo_preco_ram.joblib
@@ -290,7 +293,7 @@ streamlit run app.py
 
 ## 1. Coleta dos dados (v1)
 
-O scraper do Projeto 1 (`01_Scripts/Projeto 1/scraper_kabum.ipynb`)
+O scraper do Projeto 1 (`01_Scripts/Projeto 1/scraper_kabum_pecas.ipynb`)
 percorre as páginas de categoria do KaBuM e extrai, para cada produto:
 
 - Identificador (`id`) e nome
