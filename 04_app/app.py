@@ -15,6 +15,7 @@ Rodar:
 from __future__ import annotations
 
 import pathlib
+import sys
 from typing import Optional
 
 import joblib
@@ -24,13 +25,15 @@ import pandas as pd
 import shap
 import streamlit as st
 
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent / "02_features"))
+
 from features import FEATURES_POR_CATEGORIA, extrair_features_produto
 
 # ---------------------------------------------------------------------------
 # Configuração
 # ---------------------------------------------------------------------------
 
-MODEL_DIR = pathlib.Path(__file__).parent / "modelos"
+MODEL_DIR = pathlib.Path(__file__).resolve().parent.parent / "modelos"
 CATEGORIAS = ["ram", "cpu", "gpu", "ssd", "fonte", "placa_mae"]
 
 LABEL_CATEGORIA = {

@@ -26,6 +26,8 @@ import sys
 
 import pandas as pd
 
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent / "02_features"))
+
 from features import (
     features_cpu,
     features_fonte,
@@ -47,14 +49,14 @@ if sys.stdout.encoding.lower() != "utf-8":
 # Configuração
 # ---------------------------------------------------------------------------
 
-# 00_Dados/ mora na raiz do repositório (dois níveis acima deste script).
+# 00_Dados/ mora na raiz do repositório (um nível acima deste script).
 # Defina a variável de ambiente KABUM_DATA_ROOT para apontar para outro lugar
 # sem editar o código.
 DATA_ROOT = os.environ.get(
     "KABUM_DATA_ROOT",
-    str(pathlib.Path(__file__).resolve().parents[2] / "00_Dados"),
+    str(pathlib.Path(__file__).resolve().parents[1] / "00_Dados"),
 )
-MODEL_DIR = pathlib.Path(__file__).parent / "modelos"
+MODEL_DIR = pathlib.Path(__file__).resolve().parent.parent / "modelos"
 
 FEATURES_POR_CAT = {
     "ram":       features_ram,

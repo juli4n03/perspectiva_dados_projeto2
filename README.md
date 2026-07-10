@@ -7,12 +7,19 @@ componente (SHAP) e um aplicativo Streamlit para consumir tudo isso: análise
 de produto avulso, ranking de ofertas por categoria, compatibilidade de peças
 a partir de uma CPU-âncora e montagem de build por orçamento.
 
-O repositório contém duas iterações do projeto:
+O repositório está organizado por **etapa do pipeline**, não por entrega:
 
-- **v1 (Projeto 1)** — Web scraper, feature engineering original e um sistema de
-  recomendação com scoring manual.
-- **v2 (Projeto 2)** — Substitui o score manual por modelos de preço aprendidos
-  dos dados, com faixa conformal, SHAP e o app Streamlit.
+- **`01_coleta/`** — web scraper do KaBuM.
+- **`02_features/`** — extração de specs via regex a partir do nome do produto.
+- **`03_modelagem/`** — do scoring manual original até os modelos de preço
+  aprendidos (RandomForest + conformal, RF pooled e TabICL).
+- **`04_app/`** — aplicativo Streamlit que consome tudo isso.
+
+O projeto evoluiu em duas fases: a primeira estabeleceu a coleta, a extração
+de features e um recomendador com scoring manual; a segunda substituiu o
+score manual por modelos de preço aprendidos dos dados, com faixa conformal,
+SHAP e o app Streamlit. As duas fases são partes do mesmo trabalho — a
+seção 6 (Jornada do projeto) documenta essa evolução em detalhe.
 
 ---
 
@@ -21,7 +28,7 @@ O repositório contém duas iterações do projeto:
 1. [Estrutura do repositório](#estrutura-do-repositório)
 2. [Contexto e objetivo](#contexto-e-objetivo)
 3. [Passo a passo — como rodar tudo](#passo-a-passo--como-rodar-tudo)
-4. [Coleta dos dados (v1)](#1-coleta-dos-dados-v1)
+4. [Coleta dos dados](#1-coleta-dos-dados)
 5. [Feature engineering](#2-feature-engineering)
 6. [Modelagem — v2_02 (6 modelos especializados)](#3-modelagem--v2_02-6-modelos-especializados)
 7. [Análise metodológica — v2_03 (modelo único e investigação do conformal)](#4-análise-metodológica--v2_03-modelo-único-e-investigação-do-conformal)
@@ -37,10 +44,10 @@ O repositório contém duas iterações do projeto:
 
 ```
 perspectiva_dados_projeto2/
-├── README.md                        
+├── README.md
 ├── baixar_dados.py (baixa 00_Dados/ do Drive automaticamente)
 ├── requirements.txt (dependências Python)
-├── 00_Dados/ (coletas do scraper)
+├── 00_Dados/ (coletas do scraper, não versionado — baixe com baixar_dados.py)
 │   ├── 2026-06-26/
 │   │   ├── kabum_ram_2026-06-26.csv
 │   │   ├── kabum_ram_2026-06-26_features.csv
@@ -48,42 +55,47 @@ perspectiva_dados_projeto2/
 │   │   └── kabum_todas_pecas_2026-06-26.csv
 │   ├── 2026-07-06/
 │   └── ...
-├── 01_Scripts/
-│   ├── Projeto 1/                   ← v1: scraper + feature engineering + recomendação original
-│   │   ├── scraper_kabum_pecas.ipynb
-│   │   ├── feature_engineering_kabum.ipynb
-│   │   └── recomendacao_kabum.ipynb
-│   └── Projeto 2/                   ← v2: modelagem + app
-│       ├── features.py                              ← módulo único de extração (fonte da verdade)
-│       ├── feature_engineering_kabum_todas_datas.ipynb  ← gera os *_features.csv por coleta
-│       ├── salvar_catalogo.py                        ← gera modelos/catalogo.parquet
-│       ├── v2_01_modelo_preco_ram.ipynb              ← protótipo histórico (só RAM)
-│       ├── v2_02_modelo_preco_todas_categorias.ipynb ← treino dos 6 modelos (o que o app usa)
-│       ├── v2_03_modelo_tabicl_unico.ipynb           ← análise comparativa (pooled + TabICL + conformal)
-│       ├── app.py                   ← Streamlit
-│       └── modelos/                 ← gerado após rodar tudo
-│           ├── modelo_preco_ram.joblib
-│           ├── modelo_preco_cpu.joblib
-│           ├── ...
-│           ├── catalogo.parquet
-│           └── resumo_metricas.csv
+├── 01_coleta/
+│   └── scraper_kabum_pecas.ipynb          ← percorre o KaBuM e grava 00_Dados/
+├── 02_features/
+│   ├── features.py                        ← módulo único de extração (fonte da verdade)
+│   ├── feature_engineering_kabum.ipynb    ← versão original, por data/categoria
+│   └── feature_engineering_kabum_todas_datas.ipynb  ← versão em loop (gera *_features.csv)
+├── 03_modelagem/
+│   ├── recomendacao_kabum.ipynb           ← histórico: recomendador com scoring manual
+│   ├── salvar_catalogo.py                 ← gera modelos/catalogo.parquet
+│   ├── v2_01_modelo_preco_ram.ipynb       ← histórico: protótipo (só RAM)
+│   ├── v2_02_modelo_preco_todas_categorias.ipynb  ← treino dos 6 modelos (o que o app usa)
+│   └── v2_03_modelo_tabicl_unico.ipynb    ← análise comparativa (pooled + TabICL + conformal)
+├── modelos/                               ← artefatos gerados (compartilhado entre 03 e 04)
+│   ├── modelo_preco_ram.joblib
+│   ├── modelo_preco_cpu.joblib
+│   ├── ...
+│   ├── catalogo.parquet
+│   └── resumo_metricas.csv
+└── 04_app/
+    └── app.py                             ← Streamlit
 ```
 
 ---
 
 ## Contexto e objetivo
 
-O **v1** (Projeto 1 da disciplina) implementou:
+A **primeira fase** do projeto (pastas `01_coleta/`, `02_features/` e o
+notebook histórico em `03_modelagem/recomendacao_kabum.ipynb`) implementou:
 
-- Um web scraper que coleta produtos das seis categorias listadas no KaBuM.
-- Um pipeline de feature engineering baseado em regex, para extrair
-  atributos técnicos (capacidade, frequência, socket, etc.) do campo `nome`.
+- Um web scraper (`01_coleta/`) que coleta produtos das seis categorias
+  listadas no KaBuM.
+- Um pipeline de feature engineering baseado em regex (`02_features/`), para
+  extrair atributos técnicos (capacidade, frequência, socket, etc.) do campo
+  `nome`.
 - Um sistema de recomendação com **scoring manual** — uma fórmula heurística
   que combinava R$/GB, R$/W, avaliações e afins para tentar identificar
   produtos com bom custo-benefício.
 
-O **v2** (Projeto 2) substitui a heurística manual por **modelos de regressão
-supervisionada**, um por categoria, treinados sobre os dados coletados em
+A **segunda fase** (o restante de `03_modelagem/` e o app em `04_app/`)
+substitui a heurística manual por **modelos de regressão supervisionada**,
+um por categoria, treinados sobre os dados coletados em
 múltiplas datas. Cada modelo prevê o preço esperado de um produto dado
 suas specs, junto com uma **faixa de incerteza de 90%** via conformal
 prediction e explicações locais via SHAP. Esses modelos alimentam um app
@@ -172,7 +184,8 @@ sobre um dataset diferente do que gerou as métricas deste README.
 
 **Onde os scripts/notebooks esperam encontrar `00_Dados/`**: por padrão,
 todo script e notebook do repositório assume que `00_Dados/` está na
-**raiz do projeto** (dois níveis acima de `01_Scripts/Projeto 1|2/`) — é
+**raiz do projeto** (um nível acima de `01_coleta/`, `02_features/`,
+`03_modelagem/` ou `04_app/`) — é
 exatamente o que `baixar_dados.py` cria. Se você guardou os dados em outro
 lugar, não precisa editar nenhum código: defina a variável de ambiente
 `KABUM_DATA_ROOT` apontando para a pasta correta antes de rodar qualquer
@@ -188,7 +201,7 @@ uma sessão do Jupyter iniciada no mesmo terminal.)
 ### 4. Gerar o catálogo consolidado
 
 ```powershell
-cd "01_Scripts\Projeto 2"
+cd 03_modelagem
 python salvar_catalogo.py
 ```
 
@@ -239,9 +252,12 @@ Dura ~3 minutos numa máquina moderna sem GPU.
 
 ### 6. Rodar o app Streamlit
 
-Ainda dentro de `01_Scripts\Projeto 2\`, com o venv ativo:
+O `app.py` mora em `04_app/`, uma pasta diferente da usada nos passos
+anteriores (`03_modelagem/`). A partir de `03_modelagem/` (onde o passo
+anterior deixou você), com o venv ativo:
 
 ```powershell
+cd ..\04_app
 streamlit run app.py
 ```
 
@@ -296,19 +312,20 @@ pip install -r requirements.txt
 python baixar_dados.py
 
 # gerar catálogo e treinar
-cd "01_Scripts\Projeto 2"
+cd 03_modelagem
 python salvar_catalogo.py
 jupyter notebook v2_02_modelo_preco_todas_categorias.ipynb   # Run All
 
 # rodar app
+cd ..\04_app
 streamlit run app.py
 ```
 
 ---
 
-## 1. Coleta dos dados (v1)
+## 1. Coleta dos dados
 
-O scraper do Projeto 1 (`01_Scripts/Projeto 1/scraper_kabum_pecas.ipynb`)
+O scraper (`01_coleta/scraper_kabum_pecas.ipynb`)
 percorre as páginas de categoria do KaBuM e extrai, para cada produto:
 
 - Identificador (`id`) e nome
@@ -350,18 +367,18 @@ diagnóstico é importante para a interpretação da análise do conformal
 Existem **dois lugares** onde a extração acontece, e é intencional que os
 dois convivam:
 
-- **v1** — `feature_engineering_kabum.ipynb`: notebook original que gera
+- `02_features/feature_engineering_kabum.ipynb`: notebook original que gera
   os arquivos `_features.csv` por categoria dentro de cada pasta de coleta.
-- **v2** — `features.py`: módulo Python importável que replica e estende
+- `02_features/features.py`: módulo Python importável que replica e estende
   a mesma lógica. É a **fonte da verdade** para o app e para o script
   `salvar_catalogo.py`, e é reaplicado antes do treino em `v2_02`.
 
 ### Por que dois lugares?
 
-O v1 escrevia specs em CSVs (`*_features.csv`). Quando o v2 começou, algumas
-regex do v1 já estavam desatualizadas — por exemplo, o regex de `mobo_chipset`
-não capturava "B550M-A" corretamente, e a tabela `GPU_TDP` cobria apenas
-~25 modelos. Manter o `features.py` como um módulo Python permite:
+O notebook original escrevia specs em CSVs (`*_features.csv`). Com o tempo,
+algumas dessas regex ficaram desatualizadas — por exemplo, o regex de
+`mobo_chipset` não capturava "B550M-A" corretamente, e a tabela `GPU_TDP`
+cobria apenas ~25 modelos. Manter o `features.py` como um módulo Python permite:
 
 1. Testar a extração em isolamento (`extrair_features_produto(nome, categoria)`).
 2. Aplicar a extração no app Streamlit em tempo real (usuário cola um nome
@@ -606,10 +623,10 @@ série temporal", e é sustentada empiricamente pelos números acima.
 
 ## 5. Aplicativo Streamlit
 
-**Rodar**:
+**Rodar** (a partir da raiz do repositório):
 
 ```powershell
-cd "01_Scripts\Projeto 2"
+cd 04_app
 streamlit run app.py
 ```
 
