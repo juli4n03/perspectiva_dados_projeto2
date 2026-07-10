@@ -84,9 +84,6 @@ SOCKET_DDR = {
 }
 
 
-# Fallback: quando o nome não menciona o socket explicitamente (ex.:
-# "Core i3-14100F" sem "LGA1700"), inferir pelo modelo da CPU.
-# Padrões em regex — o primeiro que casar define o socket.
 MODELO_SOCKET_CPU = [
     # Intel — Core Ultra série 2 (Arrow Lake)
     (r"Core\s*Ultra\s*[579]\s*2\d{2}",         "LGA1851"),
@@ -158,16 +155,10 @@ def features_cpu(df: pd.DataFrame) -> pd.DataFrame:
     ))
     d["cpu_socket"] = d["cpu_socket"].apply(_normalizar_socket_cpu)
 
-    # Fallback: se o regex principal não achou socket, tenta inferir pelo modelo
-    # (ex.: "Core i3-14100F" → LGA1700 via tabela MODELO_SOCKET_CPU)
     faltando = d["cpu_socket"].isna()
     if faltando.any():
         d.loc[faltando, "cpu_socket"] = n[faltando].apply(_inferir_socket_por_modelo)
 
-    # TDP: exige "W" isolado (\s+W ou pontuação antes), evita capturar SKU
-    # tipo "100-100000926BOX" onde o número precede um W literal.
-    # (Mantido igual ao notebook original — sabemos que ainda gera outliers em
-    # alguns SKUs; ver `SANIDADE` no notebook v2_02.)
     d["cpu_tdp_w"] = n.apply(lambda x: extrair(x, r"(\d+)\s*W(?!h)", int))
 
     d["cpu_com_cooler"] = n.apply(lambda x: contem(x, r"Box|Wraith|Cooler|Fan"))
@@ -180,17 +171,13 @@ def features_cpu(df: pd.DataFrame) -> pd.DataFrame:
     ))
     d["cpu_ddr_suportado"] = d["cpu_socket"].map(SOCKET_DDR)
 
-    # Cores/threads (features novas). Padrões comuns nos nomes:
-    #   "6-Cores", "8 Cores", "6 Núcleos", "12 Threads", "24-Threads"
     d["cpu_cores"] = n.apply(lambda x: extrair(x,
         r"(\d+)\s*[-\s]?\s*(?:Cores|Núcleos|Nucleos)", int
     ))
     d["cpu_threads"] = n.apply(lambda x: extrair(x,
         r"(\d+)\s*[-\s]?\s*Threads?", int
     ))
-    # Clock base em GHz. Padrão: "3.4GHz", "3,4 GHz", "4.7 GHz". Pega o PRIMEIRO
-    # número seguido de GHz (geralmente é o base; boost costuma vir depois).
-    # Extrai como string (float() não aceita vírgula) e converte manualmente.
+
     d["cpu_clock_ghz"] = n.apply(lambda x: extrair(x, r"(\d[\.,]\d+)\s*GHz"))
     d["cpu_clock_ghz"] = d["cpu_clock_ghz"].apply(
         lambda v: float(str(v).replace(",", ".")) if pd.notna(v) else None
@@ -209,10 +196,7 @@ def features_placa_mae(df: pd.DataFrame) -> pd.DataFrame:
 
     d["mobo_socket"]      = n.apply(lambda x: extrair(x, r"(AM[45]|LGA\s?\d{3,4})"))
     d["mobo_socket"]      = d["mobo_socket"].str.replace(" ", "").str.upper()
-    # Chipset: letra + 3-4 dígitos, opcionalmente com sufixo (M, M-A, PRO, etc.)
-    # Ex.: B550, B550M, B550M-A, X670E, Z790, H610M-H, B650M-DS3H.
-    # A chave é usar lookahead pra não exigir word-boundary depois da letra
-    # (que quebra em "B550M-A" porque M-A quebra o \b).
+
     d["mobo_chipset"]     = n.apply(lambda x: extrair(x,
         r"\b([ABHXZ]\d{3,4})(?![.\d])"
     ))
@@ -229,10 +213,6 @@ def features_placa_mae(df: pd.DataFrame) -> pd.DataFrame:
 # 4. GPU
 # ---------------------------------------------------------------------------
 
-# modelo GPU → TDP aproximado em Watts
-# Cobre: NVIDIA RTX 20/30/40/50 series, GTX 10/16 series
-#        AMD RX 400/500/5000/6000/7000/9000 series
-#        Intel Arc A/B series
 GPU_TDP = {
     # NVIDIA RTX 50 series
     "RTX 5090": 575, "RTX 5080": 360, "RTX 5070 Ti": 300, "RTX 5070": 250,
