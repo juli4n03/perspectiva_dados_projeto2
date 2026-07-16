@@ -162,13 +162,6 @@ uv sync
 Isso instala pandas, scikit-learn, streamlit, shap, joblib, pyarrow, gdown
 e os demais pacotes usados. Dura ~2 minutos.
 
-Para forcar a instalacao do numpy, se necessario:
-
-```powershell
-uv pip cache purge
-uv pip install --force-reinstall --no-cache-dir numpy==1.24.4
-uv pip install --force-reinstall --no-cache-dir joblib==1.3 scikit-learn==1.3
-```
 
 ### 3. Baixar os dados do Google Drive
 
@@ -220,6 +213,9 @@ Abra o Jupyter (recomendo VS Code com a extensão Python):
 # abrir notebook via uv
 uv run jupyter notebook v2_02_modelo_preco_todas_categorias.ipynb
 ```
+
+e apos rodar, SALVE o arquivo.
+
 
 Ou clique em "Run All" no VS Code. O notebook:
 
