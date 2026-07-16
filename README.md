@@ -119,16 +119,21 @@ Esta seção é o **roteiro executável completo**, do zero até o app rodando
 no navegador. Requisitos: Windows 10/11, Python 3.11, ~4 GB livres em disco.
 
 ### 0. Pré-requisitos
+0 Pré requisitos e instalação do UV
+Requisitos: Windows 10/11, Python 3.11, ~4 GB livres em disco.
 
-Se ainda não tiver Python 3.11 instalado:
+Instalação do UV (se ainda não fez):
 
-- Baixe em https://www.python.org/downloads/release/python-3119/
-- Marque **"Add Python to PATH"** no instalador.
-- Confirme no PowerShell:
+
+# instalar uv
+```powershell
+ -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
+```
+Verificar Python e UV:
 
 ```powershell
 python --version
-# Esperado: Python 3.11.x
+uv --version
 ```
 
 ### 1. Clonar o repositório e criar ambiente virtual
@@ -140,12 +145,9 @@ Abra o PowerShell na pasta onde quer o projeto:
 git clone <URL_DO_REPO> perspectiva_dados_projeto2
 cd perspectiva_dados_projeto2
 
-# ambiente virtual isolado (recomendado)
-python -m venv .venv
-.\.venv\Scripts\Activate.ps1
+# inicializar projeto uv (cria pyproject.toml e .venv do projeto)
+uv init
 
-# se der erro de política de execução, rode uma vez:
-# Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned
 ```
 
 Quando o venv estiver ativo, o prompt mostra `(.venv)` no início da linha.
@@ -153,12 +155,20 @@ Quando o venv estiver ativo, o prompt mostra `(.venv)` no início da linha.
 ### 2. Instalar dependências
 
 ```powershell
-pip install --upgrade pip
-pip install -r requirements.txt
+uv add -r .\requirements.txt
+uv sync
 ```
 
 Isso instala pandas, scikit-learn, streamlit, shap, joblib, pyarrow, gdown
 e os demais pacotes usados. Dura ~2 minutos.
+
+Para forcar a instalacao do numpy, se necessario:
+
+```powershell
+uv pip cache purge
+uv pip install --force-reinstall --no-cache-dir numpy==1.24.4
+uv pip install --force-reinstall --no-cache-dir joblib==1.3 scikit-learn==1.3
+```
 
 ### 3. Baixar os dados do Google Drive
 
@@ -166,7 +176,8 @@ Os dados coletados estão numa pasta pública no Google Drive. Baixe
 automaticamente:
 
 ```powershell
-python baixar_dados.py
+uv run python ./baixar_dados.py
+
 ```
 
 O script vai criar `00_Dados/` e baixar 6 pastas de coleta (2026-06-26 a
@@ -177,32 +188,13 @@ conexão.
 [esta pasta no Drive](https://drive.google.com/drive/folders/1ZSOr9PP7XvwfqOHyXkj7JwfS_0cX-uJU?usp=sharing),
 baixe tudo e extraia para `00_Dados/` na raiz do projeto.
 
-**Alternativa sem Drive**: se o Drive estiver indisponível, você pode
-coletar os dados você mesmo rodando o scraper do v1 (ver seção 1).
-Mas cada coleta captura só o momento atual — os modelos serão treinados
-sobre um dataset diferente do que gerou as métricas deste README.
-
-**Onde os scripts/notebooks esperam encontrar `00_Dados/`**: por padrão,
-todo script e notebook do repositório assume que `00_Dados/` está na
-**raiz do projeto** (um nível acima de `01_coleta/`, `02_features/`,
-`03_modelagem/` ou `04_app/`) — é
-exatamente o que `baixar_dados.py` cria. Se você guardou os dados em outro
-lugar, não precisa editar nenhum código: defina a variável de ambiente
-`KABUM_DATA_ROOT` apontando para a pasta correta antes de rodar qualquer
-coisa:
-
-```powershell
-$env:KABUM_DATA_ROOT = "C:\caminho\para\sua\pasta\00_Dados"
-```
-
-(Os notebooks também respeitam essa variável quando abertos a partir de
-uma sessão do Jupyter iniciada no mesmo terminal.)
-
 ### 4. Gerar o catálogo consolidado
 
 ```powershell
 cd 03_modelagem
-python salvar_catalogo.py
+# executar o script de geração do catálogo via uv
+uv run python 03_modelagem/salvar_catalogo.py
+
 ```
 
 Isso lê `00_Dados/`, aplica extração de features via `features.py`,
@@ -225,7 +217,8 @@ Output esperado (final):
 Abra o Jupyter (recomendo VS Code com a extensão Python):
 
 ```powershell
-jupyter notebook v2_02_modelo_preco_todas_categorias.ipynb
+# abrir notebook via uv
+uv run jupyter notebook v2_02_modelo_preco_todas_categorias.ipynb
 ```
 
 Ou clique em "Run All" no VS Code. O notebook:
@@ -258,7 +251,7 @@ anterior deixou você), com o venv ativo:
 
 ```powershell
 cd ..\04_app
-streamlit run app.py
+uv run python -m streamlit run ./app.py
 ```
 
 O navegador abre em `http://localhost:8501`. Se não abrir sozinho, copie

@@ -7,7 +7,7 @@
 
 # Dados e manipulação
 pandas==2.0
-numpy==1.24
+numpy==1.24.4
 pyarrow==14.0        # leitura/escrita de modelos/catalogo.parquet
 
 # Coleta (v1 — scraper)
