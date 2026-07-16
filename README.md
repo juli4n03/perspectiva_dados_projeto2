@@ -213,8 +213,7 @@ Abra o Jupyter (recomendo VS Code com a extensão Python):
 # abrir notebook via uv
 uv run jupyter notebook v2_02_modelo_preco_todas_categorias.ipynb
 ```
-
-e apos rodar, SALVE o arquivo.
+e execute todo o arquivo (run all). E apos rodar, salve o arquivo.
 
 
 Ou clique em "Run All" no VS Code. O notebook:
