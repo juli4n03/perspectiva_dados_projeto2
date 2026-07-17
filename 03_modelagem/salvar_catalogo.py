@@ -70,9 +70,11 @@ FEATURES_POR_CAT = {
 FEATURES_COLS = {
     "ram":       ["ram_geracao", "ram_gb", "ram_mhz", "ram_cl", "ram_notebook"],
     "cpu":       ["cpu_marca", "cpu_socket", "cpu_serie", "cpu_tdp_w",
-                  "cpu_ddr_suportado", "cpu_com_cooler"],
+                  "cpu_ddr_suportado", "cpu_com_cooler",
+                  "cpu_cores", "cpu_threads", "cpu_clock_ghz"],
     "gpu":       ["gpu_marca_chip", "gpu_modelo", "gpu_vram_gb", "gpu_tdp_w"],
-    "ssd":       ["ssd_interface", "ssd_geracao_pcie", "ssd_capacidade_gb", "ssd_notebook"],
+    "ssd":       ["ssd_interface", "ssd_geracao_pcie", "ssd_capacidade_gb",
+                  "ssd_notebook", "ssd_leitura_mbs"],
     "fonte":     ["fonte_wattagem", "fonte_certificacao", "fonte_modular", "fonte_atx3"],
     "placa_mae": ["mobo_socket", "mobo_chipset", "mobo_ddr", "mobo_form_factor",
                   "mobo_slots_m2", "mobo_max_ram_gb"],

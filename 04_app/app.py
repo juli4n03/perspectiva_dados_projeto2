@@ -460,6 +460,9 @@ def _computar_precos_justos_cache(catalogo_hash: int, cat: str, _bundle: dict,
     """
     df = df_cat.copy()
     campos = _bundle["num"] + _bundle["cat"]
+    for c in campos:
+        if c not in df.columns:
+            df[c] = np.nan
     X = df[campos].copy()
     for c in _bundle["cat"]:
         if c in X.columns:
@@ -487,7 +490,6 @@ def _computar_precos_justos_cache(catalogo_hash: int, cat: str, _bundle: dict,
         axis=1,
     )
     return df
-
 
 def _computar_precos_justos(df_cat: pd.DataFrame, bundle: dict) -> pd.DataFrame:
     # id estável do catálogo por categoria (usado como parte da chave do cache)
