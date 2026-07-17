@@ -155,7 +155,7 @@ Quando o venv estiver ativo, o prompt mostra `(.venv)` no início da linha.
 ### 2. Instalar dependências
 
 ```powershell
-uv add -r .\requirements.txt
+uv add -r requirements.txt
 uv sync
 ```
 
@@ -169,7 +169,7 @@ Os dados coletados estão numa pasta pública no Google Drive. Baixe
 automaticamente:
 
 ```powershell
-uv run python ./baixar_dados.py
+uv run python baixar_dados.py
 
 ```
 
@@ -251,7 +251,7 @@ anteriores (`03_modelagem/`). A partir de `03_modelagem/` (onde o passo
 anterior deixou você), com o venv ativo:
 
 ```powershell
-cd ..\04_app
+cd \04_app
 uv run python -m streamlit run ./app.py
 ```
 
@@ -311,7 +311,7 @@ python salvar_catalogo.py
 jupyter notebook v2_02_modelo_preco_todas_categorias.ipynb   # Run All
 
 # rodar app
-cd ..\04_app
+cd 04_app
 streamlit run app.py
 ```
 
