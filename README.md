@@ -225,6 +225,12 @@ Ou clique em "Run All" no VS Code. O notebook:
 4. Salva `modelos/modelo_preco_<cat>.joblib` (6 arquivos) e
    `modelos/resumo_metricas.csv`.
 
+Ou mais rapido ainda, execute:
+
+```powershell
+uv run jupyter nbconvert --to notebook --execute --inplace 03_modelagem/v2_02_modelo_preco_todas_categorias.ipynb
+```
+
 Dura ~3 minutos numa máquina moderna sem GPU.
 
 **Métricas esperadas** (ver célula final do notebook):
