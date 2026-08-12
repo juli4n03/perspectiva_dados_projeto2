@@ -83,18 +83,30 @@ FEATURES_COLS = {
 
 
 def carregar_pasta_via_todas_pecas(pasta: pathlib.Path, data_coleta: str) -> pd.DataFrame:
-    """Fluxo original: usa kabum_todas_pecas_<data>.csv + aplica extração de specs."""
+    """Fluxo original: usa kabum_todas_pecas_<data>.csv (specs extraídas depois,
+    de forma unificada, em `reextrair_specs`)."""
     arquivo = pasta / f"kabum_todas_pecas_{data_coleta}.csv"
-    base = pd.read_csv(arquivo)
+    return pd.read_csv(arquivo)
 
+
+def reextrair_specs(base: pd.DataFrame) -> pd.DataFrame:
+    """Recalcula as specs via features.py a partir de `nome`, para TODAS as
+    coletas — inclusive as que já vieram com specs pré-computadas num
+    `_features.csv` antigo. Sem isso, coletas antigas ficam presas na
+    versão do regex de quando foram processadas pela última vez (foi assim
+    que "Ddr4"/"DDR4" e "Core I5"/"Core i5" coexistiram no catálogo até
+    normalizarmos o case em features.py).
+    """
     for cat, fn in FEATURES_POR_CAT.items():
         mask = base["categoria_key"] == cat
         if not mask.any():
             continue
         sub = fn(base.loc[mask, ["nome"]].copy())
         cols_novas = [c for c in FEATURES_COLS[cat] if c in sub.columns]
+        for c in cols_novas:
+            if c not in base.columns:
+                base[c] = None
         base.loc[mask, cols_novas] = sub[cols_novas].values
-
     return base
 
 
@@ -138,6 +150,8 @@ def carregar_e_extrair():
         if base.empty:
             print(f"  [pulei] {data_coleta}: nenhum CSV lido")
             continue
+
+        base = reextrair_specs(base)
 
         # aplica normalização de gpu_modelo (idempotente — pode rodar em cima
         # de valores já normalizados)

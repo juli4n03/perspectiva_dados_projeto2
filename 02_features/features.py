@@ -52,7 +52,10 @@ def features_ram(df: pd.DataFrame) -> pd.DataFrame:
     d = df.copy()
     n = d["nome"]
 
-    d["ram_geracao"]  = n.apply(lambda x: extrair(x, r"(DDR[2-5])"))
+    # .str.upper(): o regex casa "Ddr4"/"ddr4"/"DDR4" (IGNORECASE), mas sem
+    # normalizar o case do texto capturado essas 3 formas viram categorias
+    # diferentes pro one-hot (visto em produção: quase 50/50 DDR4 vs Ddr4).
+    d["ram_geracao"]  = n.apply(lambda x: extrair(x, r"(DDR[2-5])")).str.upper()
     d["ram_gb"]       = n.apply(lambda x: extrair(x, r"(\d+)\s*GB", int))
     d["ram_mhz"]      = n.apply(lambda x: extrair(x, r"(\d{3,5})\s*MHz", int))
     d["ram_cl"]       = n.apply(lambda x: extrair(x, r"CL(\d+)", int))
@@ -172,6 +175,28 @@ def _extrair_geracao_cpu(nome):
     return None
 
 
+def _normalizar_cpu_serie(s):
+    """Colapsa "Core I5"/"core i7"/"RYZEN 5" etc. numa forma canônica única.
+
+    Sem isso, "Core i5" e "Core I5" (I maiúsculo) viram categorias
+    diferentes pro one-hot — visto em produção fragmentando quase 800
+    CPUs i5 em dois grupos.
+    """
+    if pd.isna(s):
+        return None
+    s = re.sub(r"\s+", " ", str(s)).strip()
+    m = re.match(r"(?i)^core\s*i([3579])$", s)
+    if m:
+        return f"Core i{m.group(1)}"
+    m = re.match(r"(?i)^core\s*ultra\s*(\d+)$", s)
+    if m:
+        return f"Core Ultra {m.group(1)}"
+    m = re.match(r"(?i)^ryzen\s*([3579])$", s)
+    if m:
+        return f"Ryzen {m.group(1)}"
+    return s
+
+
 def features_cpu(df: pd.DataFrame) -> pd.DataFrame:
     d = df.copy()
     n = d["nome"]
@@ -201,7 +226,7 @@ def features_cpu(df: pd.DataFrame) -> pd.DataFrame:
     )
     d["cpu_serie"] = n.apply(lambda x: extrair(x,
         r"(Ryzen\s*[3579]|Core\s*i[3579]|Core\s*Ultra\s*\d)"
-    ))
+    )).apply(_normalizar_cpu_serie)
     d["cpu_ddr_suportado"] = d["cpu_socket"].map(SOCKET_DDR)
 
     d["cpu_cores"] = n.apply(lambda x: extrair(x,
@@ -228,6 +253,22 @@ def features_cpu(df: pd.DataFrame) -> pd.DataFrame:
 # 3. Placa-mãe
 # ---------------------------------------------------------------------------
 
+def _normalizar_form_factor(s):
+    """Colapsa ATX/Atx, ITX/Itx, M-ATX/M-Atx/Micro-atx/MATX etc. em 3
+    categorias canônicas (ATX, mATX, ITX) — sem isso viravam ~19 valores
+    distintos pro one-hot (ex.: "Matx" e "Atx" quase empatados com "mATX"
+    e "ATX" respectivamente).
+    """
+    if pd.isna(s):
+        return None
+    s2 = re.sub(r"[\s-]", "", str(s)).upper()
+    if "ITX" in s2:
+        return "ITX"
+    if "ATX" in s2 and s2 != "ATX":
+        return "mATX"
+    return "ATX"
+
+
 def features_placa_mae(df: pd.DataFrame) -> pd.DataFrame:
     d = df.copy()
     n = d["nome"]
@@ -239,8 +280,10 @@ def features_placa_mae(df: pd.DataFrame) -> pd.DataFrame:
         r"\b([ABHXZ]\d{3,4})(?![.\d])"
     ))
     d["mobo_chipset"]     = d["mobo_chipset"].str.upper() if "mobo_chipset" in d.columns else d["mobo_chipset"]
-    d["mobo_ddr"]         = n.apply(lambda x: extrair(x, r"(DDR[45])"))
-    d["mobo_form_factor"] = n.apply(lambda x: extrair(x, r"\b(ATX|mATX|m-ATX|Micro-ATX|Mini-ATX|ITX|Mini-ITX)\b"))
+    d["mobo_ddr"]         = n.apply(lambda x: extrair(x, r"(DDR[45])")).str.upper()
+    d["mobo_form_factor"] = n.apply(lambda x: extrair(
+        x, r"\b(ATX|mATX|m-ATX|Micro-ATX|Mini-ATX|ITX|Mini-ITX)\b"
+    )).apply(_normalizar_form_factor)
     d["mobo_slots_m2"]    = n.apply(lambda x: extrair(x, r"(\d+)\s*x?\s*M\.2", int))
     d["mobo_max_ram_gb"]  = n.apply(lambda x: extrair(x, r"(\d+)\s*GB(?=.*RAM)", int))
 
@@ -417,7 +460,9 @@ def features_fonte(df: pd.DataFrame) -> pd.DataFrame:
     n = d["nome"]
 
     d["fonte_wattagem"]     = n.apply(lambda x: extrair(x, r"(\d{3,4})\s*W(?!h)", int))
-    d["fonte_certificacao"] = n.apply(lambda x: extrair(x, r"(Titanium|Platinum|Gold|Silver|Bronze)"))
+    d["fonte_certificacao"] = n.apply(lambda x: extrair(
+        x, r"(Titanium|Platinum|Gold|Silver|Bronze)"
+    )).str.capitalize()
     d["fonte_modular"]      = n.apply(lambda x:
         "Full"  if contem(x, r"Full.?Modular|Modular\s*Full") else
         "Semi"  if contem(x, r"Semi.?Modular|Modular\s*Semi") else
