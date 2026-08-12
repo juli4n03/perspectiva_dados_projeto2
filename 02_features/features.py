@@ -57,6 +57,10 @@ def features_ram(df: pd.DataFrame) -> pd.DataFrame:
     d["ram_mhz"]      = n.apply(lambda x: extrair(x, r"(\d{3,5})\s*MHz", int))
     d["ram_cl"]       = n.apply(lambda x: extrair(x, r"CL(\d+)", int))
     d["ram_notebook"] = n.apply(lambda x: contem(x, r"Notebook|SODIMM|SO-DIMM"))
+    # Kits gamer com iluminação RGB cobram um prêmio de preço que não se
+    # explica pelas specs numéricas (capacidade/MHz/CL iguais a um kit sem
+    # RGB) — feature explícita evita que esse prêmio vire ruído no modelo.
+    d["ram_rgb"]      = n.apply(lambda x: contem(x, r"\bA?RGB\b"))
 
     return d
 
@@ -139,6 +143,35 @@ def _normalizar_socket_cpu(s):
     return f"LGA{n}"
 
 
+def _extrair_geracao_cpu(nome):
+    """Geração/série como número ordinal (quanto maior, mais recente).
+
+    Intel: usa o número de geração real (6..14). Modelos de 4 dígitos
+    (i7-9700) têm o 1º dígito como geração; de 5 dígitos (i5-12400), os
+    2 primeiros. Core Ultra (séries 1 e 2) não seguem essa numeração —
+    tratamos como 15 (mais recentes que a 14ª geração "clássica").
+    AMD: usa o 1º dígito do número de 4 dígitos após "Ryzen X" (Ryzen
+    5000 -> 5, Ryzen 9000 -> 9) — não é "geração" no sentido Intel, mas é
+    ordinal dentro da própria marca, que é o que basta para o modelo achar
+    o corte de preço certo.
+    """
+    if pd.isna(nome):
+        return None
+    if re.search(r"Core\s*Ultra", nome, re.IGNORECASE):
+        return 15
+    m = re.search(r"Threadripper.*?(\d)\d{3}", nome, re.IGNORECASE)
+    if m:
+        return int(m.group(1))
+    m = re.search(r"Ryzen\s*[3579]\s*(\d)\d{3}", nome, re.IGNORECASE)
+    if m:
+        return int(m.group(1))
+    m = re.search(r"i[3579]-(\d{4,5})(?!\d)", nome, re.IGNORECASE)
+    if m:
+        num = m.group(1)
+        return int(num[:2]) if len(num) == 5 else int(num[0])
+    return None
+
+
 def features_cpu(df: pd.DataFrame) -> pd.DataFrame:
     d = df.copy()
     n = d["nome"]
@@ -182,6 +215,11 @@ def features_cpu(df: pd.DataFrame) -> pd.DataFrame:
     d["cpu_clock_ghz"] = d["cpu_clock_ghz"].apply(
         lambda v: float(str(v).replace(",", ".")) if pd.notna(v) else None
     )
+
+    d["cpu_geracao"] = n.apply(_extrair_geracao_cpu)
+    # X3D/3D V-Cache (AMD) tem prêmio de preço grande sobre o irmão sem
+    # cache 3D, mesmo com cores/threads/clock quase idênticos.
+    d["cpu_x3d"] = n.apply(lambda x: contem(x, r"X3D|3D\s?V-?Cache"))
 
     return d
 
@@ -358,6 +396,13 @@ def features_ssd(df: pd.DataFrame) -> pd.DataFrame:
     # Velocidade de leitura em MB/s (feature nova) — proxy pra qualidade/geração.
     # Padrão: "5000MB/s", "leitura 7000MB/s", "7300 mb/s"
     d["ssd_leitura_mbs"] = n.apply(lambda x: extrair(x, r"(\d{3,5})\s*[Mm][Bb]/[Ss]", int))
+    # Velocidade de gravação — normalmente citada logo depois da leitura
+    # ("Leitura: 7400MB/s e Gravação: 6400MB/s"); SSDs baratos costumam
+    # informar só a leitura, então a ausência já é um sinal de tier inferior.
+    d["ssd_escrita_mbs"] = n.apply(lambda x: extrair(
+        x, r"Grava[cç][aã]o:?\s*(\d{3,5})\s*[Mm][Bb]/[Ss]", int
+    ))
+    d["ssd_dram_cache"] = n.apply(lambda x: contem(x, r"DRAM"))
     d["ssd_notebook"] = n.apply(lambda x: contem(x, r"Notebook|2230|2242"))
 
     return d
@@ -379,6 +424,7 @@ def features_fonte(df: pd.DataFrame) -> pd.DataFrame:
         "Não"   if contem(x, r"Não.?Modular|Non.?Modular") else None
     )
     d["fonte_atx3"] = n.apply(lambda x: contem(x, r"ATX\s*3\.0|ATX3"))
+    d["fonte_rgb"]  = n.apply(lambda x: contem(x, r"\bA?RGB\b"))
 
     return d
 

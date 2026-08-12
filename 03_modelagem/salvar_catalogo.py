@@ -68,14 +68,15 @@ FEATURES_POR_CAT = {
 }
 
 FEATURES_COLS = {
-    "ram":       ["ram_geracao", "ram_gb", "ram_mhz", "ram_cl", "ram_notebook"],
+    "ram":       ["ram_geracao", "ram_gb", "ram_mhz", "ram_cl", "ram_notebook", "ram_rgb"],
     "cpu":       ["cpu_marca", "cpu_socket", "cpu_serie", "cpu_tdp_w",
                   "cpu_ddr_suportado", "cpu_com_cooler",
-                  "cpu_cores", "cpu_threads", "cpu_clock_ghz"],
+                  "cpu_cores", "cpu_threads", "cpu_clock_ghz",
+                  "cpu_geracao", "cpu_x3d"],
     "gpu":       ["gpu_marca_chip", "gpu_modelo", "gpu_vram_gb", "gpu_tdp_w"],
     "ssd":       ["ssd_interface", "ssd_geracao_pcie", "ssd_capacidade_gb",
-                  "ssd_notebook", "ssd_leitura_mbs"],
-    "fonte":     ["fonte_wattagem", "fonte_certificacao", "fonte_modular", "fonte_atx3"],
+                  "ssd_notebook", "ssd_leitura_mbs", "ssd_escrita_mbs"],
+    "fonte":     ["fonte_wattagem", "fonte_certificacao", "fonte_modular", "fonte_atx3", "fonte_rgb"],
     "placa_mae": ["mobo_socket", "mobo_chipset", "mobo_ddr", "mobo_form_factor",
                   "mobo_slots_m2", "mobo_max_ram_gb"],
 }
@@ -188,16 +189,23 @@ def main():
     # marca produtos "não-genuínos"
     # (?:...) em vez de (...) para evitar UserWarning do pandas
     PADROES_NAO_GENUINOS = {
-        "ram":       r"\b(?:adaptador|dissipador|cooler|case|carcaça|carcaca|"
+        # "dissipador"/"cooler" saíram do padrão: kits DDR5 gamer genuínos
+        # (Corsair Vengeance, Kingston Fury) citam "com dissipador de
+        # alumínio" na própria descrição — dava falso-positivo.
+        "ram":       r"\b(?:adaptador|case|carcaça|carcaca|"
                      r"raid card|riser|controladora|extensor"
                      r"|poweredge|proliant|precision|macpro|mac pro|"
                      r"ml\d{3}|dl\d{3}|bl\d{3}|c\d{4}\b|"
                      r"ecc|registered|rdimm|udimm ecc|"
                      r"512\s*mb|1024\s*mb|"
-                     r"pc2-|pc3l-"
+                     r"pc2-|pc3l-|"
+                     r"servidor|thinkserver|thinkstation|workstation|system\s?x|"
+                     r"storage|qnap|asustor"
                      r")\b",
-        "cpu":       r"\b(?:cooler|water cooler|arctic|noctua|dissipador|"
-                     r"pasta térmica|pasta termica|thermal|adaptador socket)\b",
+        # "cpu": sem filtro — o padrão anterior (cooler|thermal|...) dava só
+        # falso-positivo aqui: processadores genuínos frequentemente citam
+        # "Sem Cooler"/"Com Cooler" na própria descrição, e o KaBuM não lista
+        # coolers avulsos dentro da categoria "processadores".
         "gpu":       r"\b(?:suporte de gpu|suporte para placa|suporte placa|"
                      r"suporte ajustável|suporte ajustavel|"
                      r"riser|extensor|cabo|adaptador|"
